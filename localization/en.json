@@ -1,0 +1,8 @@
+{
+    "token_empty": "The token cannot be empty",
+    "token_save_error": "Failed to save the token",
+    "token_read_error": "Failed to read the token",
+    "token_delete_error": "Failed to delete the token",
+    "input_token": "Enter the access token for Yandex Disk",
+    "token_changed": "Access token changed."
+}

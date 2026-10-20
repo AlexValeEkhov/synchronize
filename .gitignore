@@ -1,0 +1,13 @@
+__pycache__/
+env/
+venv/
+w-env/
+l-env/
+.mypy_cache/
+.vscode/
+config.*
+help.txt
+*.db
+settings.json
+_deprecated.*
+*.log
