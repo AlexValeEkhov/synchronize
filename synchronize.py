@@ -84,7 +84,7 @@ async def get_user_info(session: aiohttp.ClientSession, headers: dict) -> dict:
 async def get_root_folder(session, headers: dict) -> tuple[str, str] | tuple[None, None]:
     async with session.get(BASE_URL, headers=headers, params={"path": "/"}) as response:
         if response.status != 200:
-            print(f"{RED}Ошибка: {response.status}\n{await response.text()}")
+            print(f"{RED}{loc.tr('http_error')}: {response.status}\n{await response.text()}")
             return None, None
 
         data = await response.json()
@@ -93,17 +93,17 @@ async def get_root_folder(session, headers: dict) -> tuple[str, str] | tuple[Non
     folders = [item for item in items if item["type"] == "dir"]
 
     if not folders:
-        print(f"{RED}Нет доступных папок в корне")
+        print(f"{RED}{loc.tr('no_root_folders')}")
         return None, None
 
     while True:
-        print(f"\n{GREEN}Доступные папки в корне Яндекс.Диска:{RESET}")
+        print(f"\n{GREEN}{loc.tr('available_root_folders')}{RESET}")
         for i, folder in enumerate(folders, start=1):
             print(f"{RED}{i:>3} {w} {BLUE}{folder['name']}")
-        print(f"\n{RED}  0 {w} {ORANGE}Вернуться в меню")
+        print(f"\n{RED}  0 {w} {ORANGE}{loc.tr('return_to_menu')}")
 
         try:
-            choice = int(input(f"{GREEN}Выберите номер папки: {w}"))
+            choice = int(input(f"{GREEN}{loc.tr('select_folder_number')}: {w}"))
             if choice == 0:
                 return None, None
             if 1 <= choice <= len(folders):
@@ -111,7 +111,7 @@ async def get_root_folder(session, headers: dict) -> tuple[str, str] | tuple[Non
         except ValueError:
             pass
 
-        print(f"{RED}Ошибка: введите число от 0 до {len(folders)}")
+        print(f"{RED}{loc.tr('enter_number_range')}: 0–{len(folders)}")
 
 
 def get_free_space(folder_name: Path):
@@ -119,7 +119,11 @@ def get_free_space(folder_name: Path):
 
 
 def format_size(size_bytes: int):
-    return f"{size_bytes / (1024**3):.2f} ГБ" if size_bytes >= 1024**3 else f"{size_bytes / (1024**2):.2f} МБ"
+    return (
+        f"{size_bytes / (1024**3):.2f} {loc.tr('size_gb')}"
+        if size_bytes >= 1024**3
+        else f"{size_bytes / (1024**2):.2f} {loc.tr('size_mb')}"
+    )
 
 
 def read_md5_cache(base_dir):
@@ -188,14 +192,14 @@ def get_file_info(root_dir: Path, folder_name: str, md5_cache: dict):
             del cache[rel_path]
 
     log(
-        f"\n{YELLOW}📂 {GREEN}Локально найдено файлов:{' ' * 8}{BLUE}{file_count}, "
-        f"общий размер: {total_size:,} байт ({format_size(total_size)})"
+        f"\n{YELLOW}📂 {GREEN}{loc.tr('local_files_found')}:{' ' * 8}{BLUE}{file_count}, "
+        f"{loc.tr('total_size')}: {total_size:,} {loc.tr('size_bytes')} ({format_size(total_size)})"
     )
     return file_info
 
 
 def calculate_file_hash(file_path: Path, ind: int, total: int, hash_algorithm: str = "md5"):
-    message = f"\r{r} {BLUE}Считаю хэш-сумму файла {ind} из {total}: \n"
+    message = f"\r{r} {BLUE}{loc.tr('calculating_file_hash')} {ind} {loc.tr('of')} {total}: \n"
     print(message, end="")
     try:
         h = hashlib.new(hash_algorithm)
@@ -242,8 +246,8 @@ async def get_yandex_file_info_async(base_path: str, headers: dict, session: aio
     await list_folder(session, f"disk:/{base_path.strip('/')}")
 
     log(
-        f"{WHITE}☁  {GREEN}На {RED}Яндекс.Диске {GREEN}найдено файлов: "
-        f"{BLUE}{file_count}, общий размер: {total_size:,} байт ({format_size(total_size)})"
+        f"{WHITE}☁  {GREEN}{loc.tr('files_found_on')} {RED}{loc.tr('yandex_disk')} {GREEN}{loc.tr('files_count')}: "
+        f"{BLUE}{file_count}, {loc.tr('total_size')}: {total_size:,} {loc.tr('size_bytes')} ({format_size(total_size)})"
     )
     return file_info
 
@@ -267,11 +271,11 @@ def find_invalid_paths(file_info: dict):
             reason = None
 
             if re.search(INVALID_CHARS, part):
-                reason = "запрещённые символы"
+                reason = loc.tr("invalid_characters")
             elif part.endswith((" ", ".")):
-                reason = "заканчивается на пробел или точку"
+                reason = loc.tr("ends_with_space_or_dot")
             elif part.upper() in RESERVED_NAMES:
-                reason = "зарезервированное имя"
+                reason = loc.tr("reserved_name")
 
             if reason:
                 grouped[(part, reason)].append(rel_path)
@@ -281,12 +285,12 @@ def find_invalid_paths(file_info: dict):
 
 
 def manage_invalid(invalid):
-    msg = f"На Яндексе найдены проблемные пути: {len(invalid)}"
+    msg = f"{loc.tr('invalid_paths_found')}: {len(invalid)}"
     print(f"\n{x} {RED}{msg}")
     for (bad_part, reason), paths in invalid.items():
         print(f"{ORANGE}{paths[0]}")
         print(f"  └─ {RED}{bad_part}")
-        print(f"  └─ {BLUE}причина: {reason}")
+        print(f"  └─ {BLUE}{loc.tr('reason')}: {reason}")
 
 
 def has_enough_space(free: int, size: int):
@@ -310,7 +314,7 @@ async def download_file_from_yandex(
     ) as response:
         if response.status != 200:
             log(
-                f"  {RED}⛔ Ошибка получения ссылки: {response.status}\n{await response.text()}",
+                f"  {RED}⛔ {loc.tr('download_link_error')}: {response.status}\n{await response.text()}",
                 3,
             )
             return None
@@ -320,7 +324,7 @@ async def download_file_from_yandex(
 
     if not download_url:
         log(
-            f"  {RED}⛔ Не удалось получить ссылку на скачивание для {yandex_path}{RESET}",
+            f"  {RED}⛔ {loc.tr('download_link_missing')} {yandex_path}{RESET}",
             3,
         )
         return None
@@ -338,7 +342,7 @@ async def download_file_from_yandex(
                     total=size,
                     unit="B",
                     unit_scale=True,
-                    desc=f"  {BLUE}💾 Скачиваю",
+                    desc=f"  {BLUE}💾 {loc.tr('downloading')}",
                     ncols=100,
                     leave=False,
                     colour=barcolor,
@@ -349,13 +353,13 @@ async def download_file_from_yandex(
                         f.write(chunk)
                         pbar.update(len(chunk))
 
-        log(f"  {GREEN}💾 Скачано: {BLUE}{local_path}{RESET}")
+        log(f"  {GREEN}💾 {loc.tr('downloaded')}: {BLUE}{local_path}{RESET}")
         return local_path.stat().st_mtime
 
     except OSError as e:
         if e.errno == 28:
             log(
-                f"  {RED}⛔ Недостаточно места на диске для {local_path}{RESET}",
+                f"  {RED}⛔ {loc.tr('insufficient_disk_space_for')} {local_path}{RESET}",
                 3,
             )
             return None
@@ -369,7 +373,13 @@ def copy_with_progress(src, dst, buffer_size=8 * 1024 * 1024):
         open(src, "rb") as fsrc,
         open(dst, "wb") as fdst,
         bar(
-            total=total_size, unit="B", unit_scale=True, desc=f"  {BLUE}💾 Копирую", leave=False, ncols=100, colour=barcolor
+            total=total_size,
+            unit="B",
+            unit_scale=True,
+            desc=f"  {BLUE}💾 {loc.tr('copying')}",
+            leave=False,
+            ncols=100,
+            colour=barcolor,
         ) as pbar,
     ):
         for buf in iter(lambda: fsrc.read(buffer_size), b""):
@@ -388,7 +398,7 @@ def resolve_missing(data1: dict, data2: dict, info2: dict, state: AppState, rel_
 
         if data2.get(path):  # копирование
             copy_with_progress(info1["full_path"], new_path)
-            log(f"  {GREEN}Скопирован: {BLUE}{info1['full_path']} {w}{BLUE}{new_path}", 2)
+            log(f"  {GREEN}{loc.tr('copied')}: {BLUE}{info1['full_path']} {w}{BLUE}{new_path}", 2)
             data1[str(rel_path)] = {"size": info2["size"], "full_path": str(new_path), "md5": info2["md5"]}
         else:  # перемещение
             try:
@@ -399,7 +409,7 @@ def resolve_missing(data1: dict, data2: dict, info2: dict, state: AppState, rel_
                 else:
                     raise
             moved.append(info1["full_path"])
-            log(f"  {GREEN}Перемещен/Переименован: {BLUE}{info1['full_path']} {w}{BLUE}{new_path}", 2)
+            log(f"  {GREEN}{loc.tr('moved_or_renamed')}: {BLUE}{info1['full_path']} {w}{BLUE}{new_path}", 2)
 
         last_edit = new_path.stat().st_mtime
         if last_edit:
@@ -426,7 +436,7 @@ async def synchronize(
         if ind % 100 == 0:
             free = get_free_space(folder)
 
-        sync_message = f"\r{r} {BLUE}Синхронизация {ind} из {len(all_paths)}: "
+        sync_message = f"\r{r} {BLUE}{loc.tr('synchronizing')} {ind} {loc.tr('of')} {len(all_paths)}: "
         print(sync_message, end="")
 
         lag = 0.002 if len(all_paths) > 1000 else 0.01
@@ -439,17 +449,21 @@ async def synchronize(
             found = resolve_missing(data1, data2, info2, state, rel_path, folder_name, moved)
             if found:
                 continue
-            log(f"\n  {x}{ORANGE}Только на Яндекс.Диске: {info2['path']}")
+            log(f"\n  {x}{ORANGE}{loc.tr('only_on_yandex_disk')}: {info2['path']}")
             download = True
         elif not info2:
-            log(f"Только локально: {info1['full_path']}", print_msg=False)
+            log(f"{loc.tr('only_local')}: {info1['full_path']}", print_msg=False)
             local.append(info1["full_path"])
             continue
         elif info1["md5"] != info2["md5"]:
-            log(f"\n  {ORANGE}⚠️ Хэшсуммы не совпадают:\n    {info1['md5']} — Локально\n    {info2['md5']} — Яндекс.Диск")
+            log(
+                f"\n  {ORANGE}⚠️ {loc.tr('hashes_do_not_match')}:\n"
+                f"    {info1['md5']} — {loc.tr('locally')}\n"
+                f"    {info2['md5']} — {loc.tr('yandex_disk')}"
+            )
             download = True
         else:
-            log(f"Идентичны: {info1['full_path']} и {info2['path']}", print_msg=False)
+            log(f"{loc.tr('identical')}: {info1['full_path']} {loc.tr('and')} {info2['path']}", print_msg=False)
             continue
 
         if download and info2:
@@ -465,24 +479,24 @@ async def synchronize(
                 if last_edit:
                     state.md5_cache[folder_name][rel_path] = {"md5": info2["md5"], "last_edit": last_edit}
             else:
-                log(f"{RED}⛔ Недостаточно места для {local_path}{RESET}", 3)
+                log(f"{RED}⛔ {loc.tr('insufficient_space_for')} {local_path}{RESET}", 3)
 
     return local, moved
 
 
 def clean_up(local: list[str], base_dir: Path):
-    if local and input(f"{RED}Удалить локальные файлы? Y/N\n{w} ").lower() == "y":
+    if local and input(f"{RED}{loc.tr('delete_local_files_prompt')}{w} ").lower() == "y":
         for file in local:
             try:
                 Path(file).unlink()
-                print(f"{v} {GREEN}{file} удален с локального диска.")
+                print(f"{v} {GREEN}{file} {loc.tr('deleted_from_local_disk')}\n")
             except FileNotFoundError:
                 continue
     for dirpath in sorted(base_dir.rglob("*"), key=lambda p: -p.parts.__len__()):
         if dirpath.is_dir():
             try:
                 dirpath.rmdir()
-                log(f"Удалена пустая папка: {dirpath.name}", print_msg=False)
+                log(f"{loc.tr('empty_folder_deleted')}: {dirpath.name}", print_msg=False)
             except OSError:
                 continue
     print()
@@ -498,13 +512,13 @@ async def settings_menu(state: AppState, session: aiohttp.ClientSession):
     while True:
         clear()
         state = await load_app_state(session)
-        print(f"{BLUE}Пользователь: {YELLOW}{state.user}")
-        print(f"{GREEN}\nНастройки программы:")
-        print(f"{GREEN}  1 {w} {BLUE}Изменить каталог сохранения. Текущий: {YELLOW}{state.base_dir}")
-        print(f"{GREEN}  2 {w} {BLUE}Изменить язык интерфейса. Текущий: {YELLOW}{state.lang}")
-        print(f"{GREEN}  3 {w} {BLUE}Изменить токен доступа")
-        print(f"{GREEN}  4 {w} {BLUE}Удалить токен доступа")
-        print(f" {'_' * 52}\n{RED} Any Key {w} {BLUE} Вернуться в главное меню")
+        print(f"{BLUE}{loc.tr('user')}: {YELLOW}{state.user}")
+        print(f"{GREEN}\n{loc.tr('program_settings')}:")
+        print(f"{GREEN}  1 {w} {BLUE}{loc.tr('change_save_directory')}. {loc.tr('current')}: {YELLOW}{state.base_dir}")
+        print(f"{GREEN}  2 {w} {BLUE}{loc.tr('change_interface_language')}. {loc.tr('current')}: {YELLOW}{state.lang}")
+        print(f"{GREEN}  3 {w} {BLUE}{loc.tr('change_access_token')}")
+        print(f"{GREEN}  4 {w} {BLUE}{loc.tr('delete_access_token')}")
+        print(f" {'_' * 52}\n{RED} {loc.tr('any_key')} {w} {BLUE} {loc.tr('return_to_main_menu')}")
 
         choice = input(f"{w} ")
         if choice not in {"1", "2", "3", "4"}:
@@ -517,7 +531,7 @@ async def settings_menu(state: AppState, session: aiohttp.ClientSession):
             _ = change_token()
         elif choice == "4":
             delete_token()
-            log(f"{YELLOW}Токен доступа удален. Необходимо ввести новый токен для продолжения работы.")
+            log(f"{YELLOW}{loc.tr('access_token_deleted_reenter_required')}")
     return state
 
 
@@ -528,11 +542,11 @@ async def main_async():
         while True:
             dir_list = [x for x in state.md5_cache.keys()]
             try:
-                log(f"{BLUE}Пользователь: {YELLOW}{state.user}")
-                print(f"\n{GREEN}  1 {w} {BLUE}Синхронизировать все папки на локальном диске:\n\t{YELLOW}{dir_list}")
-                print(f"{GREEN}  2 {w} {BLUE}Выбрать папку для синхронизации на {RED}Яндекс.Диске")
-                print(f"{GREEN}  3 {w} {BLUE}Изменить настройки")
-                print(f" {'_' * 52}\n{RED} Any Key {w} {BLUE} Выйти из программы.")
+                log(f"{BLUE}{loc.tr('user')}: {YELLOW}{state.user}")
+                print(f"\n{GREEN}  1 {w} {BLUE}{loc.tr('sync_all_local_folders')}:\n\t{YELLOW}{dir_list}")
+                print(f"{GREEN}  2 {w} {BLUE}{loc.tr('select_yandex_folder')}")
+                print(f"{GREEN}  3 {w} {BLUE}{loc.tr('change_settings')}")
+                print(f" {'_' * 52}\n{RED} {loc.tr('any_key')} {w} {BLUE} {loc.tr('exit_program')}")
                 choice = input(f"{w} ")
                 if choice not in {"1", "2", "3"}:
                     break
@@ -549,7 +563,7 @@ async def main_async():
 
                 local, moved = [], []
                 for folder_name in dir_list:
-                    print(f"{YELLOW}📂 {BLUE}Обрабатываю папку {YELLOW}{folder_name}")
+                    print(f"{YELLOW}📂 {BLUE}{loc.tr('processing_folder')} {YELLOW}{folder_name}")
                     folder = state.base_dir / folder_name
                     folder.mkdir(parents=True, exist_ok=True)
                     data1 = get_file_info(folder, folder_name, state.md5_cache)
@@ -560,11 +574,11 @@ async def main_async():
                         break
                     local, moved = await synchronize(folder, folder_name, data1, data2, state, local, moved, session)
                 else:
-                    msg = "Синхронизация окончена"
+                    msg = loc.tr("sync_finished")
                     print(f"\n{v} {GREEN}{msg}.")
                     local = [x for x in local if x not in moved]
                     if local:
-                        print(f"\n{w}{ORANGE}Только локально:")
+                        print(f"\n{w}{ORANGE}{loc.tr('only_local')}:")
                         for path in local:
                             print("  " + str(path))
 
@@ -574,7 +588,7 @@ async def main_async():
                     continue
                 continue
             except Exception as e:
-                err_text = f"Критическая ошибка: {e}\n{traceback.format_exc()}"
+                err_text = f"{loc.tr('critical_error')}: {e}\n{traceback.format_exc()}"
                 log(err_text, 3)
 
 

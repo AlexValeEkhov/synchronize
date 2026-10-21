@@ -7,7 +7,6 @@ _current_locale = {}
 
 
 def load_locale(language: str) -> None:
-    """Загрузить выбранную локализацию."""
     global _current_locale
 
     path = LOCALES_DIR / f"{language}.json"
@@ -17,5 +16,4 @@ def load_locale(language: str) -> None:
 
 
 def tr(key: str) -> str:
-    """Получить перевод по ключу."""
     return _current_locale.get(key, key)

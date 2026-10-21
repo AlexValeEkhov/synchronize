@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 from tkinter import Tk, filedialog
 
+import localization as loc
 from colors import BLUE, GREEN, ORANGE, RED, YELLOW, w
 from logger import log
 
@@ -24,7 +25,7 @@ def choose_path(initial_dir=None):
         result = filedialog.askdirectory(
             initialdir=initial_dir,
             parent=root,
-            title="Выберите каталог сохранения",
+            title=loc.tr("choose_save_directory"),
         )
         return Path(result) if result else None
     finally:
@@ -54,24 +55,24 @@ def load_settings(settings_path=SETTINGS_PATH):
         settings = json.load(f)
 
     if not isinstance(settings, dict):
-        raise ValueError(f"{RED}Настройки должны быть JSON-объектом.")
+        raise ValueError(f"{RED}{loc.tr('settings_must_be_json_object')}")
 
     if not isinstance(settings.get("base_dir"), str):
-        raise ValueError(f"{RED}Параметр base_dir должен быть строкой.")
+        raise ValueError(f"{RED}{loc.tr('base_dir_must_be_string')}")
 
     if not isinstance(settings.get("language"), str):
-        raise ValueError(f"{RED}Параметр language должен быть строкой.")
+        raise ValueError(f"{RED}{loc.tr('language_must_be_string')}")
 
     return settings
 
 
 def define_settings(settings_path=SETTINGS_PATH):
-    print(f"{ORANGE}Выберите каталог для сохранения файлов:")
+    print(f"{ORANGE}{loc.tr('select_save_directory')}")
 
     selected_path = choose_path()
 
     if selected_path is None:
-        raise RuntimeError(f"{RED}Выбор каталога отменён.")
+        raise RuntimeError(f"{RED}{loc.tr('directory_selection_cancelled')}")
 
     base_dir = selected_path / "Yandex Disk"
     language = change_language()
@@ -81,7 +82,7 @@ def define_settings(settings_path=SETTINGS_PATH):
     settings["language"] = language
 
     save_settings(settings, settings_path)
-    print(f"{GREEN}Настройки сохранены.")
+    print(f"{GREEN}{loc.tr('settings_saved')}")
 
     return settings
 
@@ -90,7 +91,7 @@ def change_setting(key, value, settings_path=SETTINGS_PATH):
     settings = load_settings(settings_path)
 
     if key not in DEFAULT_SETTINGS:
-        raise KeyError(f"{RED}Неизвестный параметр: {key}")
+        raise KeyError(f"{RED}{loc.tr('unknown_setting')}: {key}")
 
     settings[key] = value
     save_settings(settings, settings_path)
@@ -120,21 +121,23 @@ def get_localizations() -> dict:
 
 def change_language(settings_path=SETTINGS_PATH):
     localizations = get_localizations()
-    for num, loc in localizations.items():
-        print(f"{GREEN}  {num} {w} {YELLOW}{loc}")
-
-    choice = input(f"\n{ORANGE}Выберите язык приложения {w} {BLUE}").lower()
-    language = localizations.get(int(choice))
+    for num, language in localizations.items():
+        print(f"{GREEN}  {num} {w} {YELLOW}{language}")
+    try:
+        choice = int(input(f"\n{ORANGE}{loc.tr('choose_app_language')} {w} {BLUE}").lower())
+    except ValueError:
+        language = None
+    language = localizations.get(choice)
 
     if not language:
-        log(f"{RED}Ошибка выбора. Установлен язык по умолчанию: En")
+        log(f"{RED}{loc.tr('language_selection_error')}")
         language = "en"
 
     change_setting("language", language, settings_path)
+    return language
 
 
 def read_settings(settings_path=SETTINGS_PATH):
-    """Возвращает проверенный каталог сохранения."""
     settings_path = Path(settings_path)
 
     if not settings_path.exists():
@@ -143,8 +146,8 @@ def read_settings(settings_path=SETTINGS_PATH):
         try:
             settings = load_settings(settings_path)
         except (json.JSONDecodeError, ValueError) as e:
-            print(f"{RED}Ошибка в файле настроек: {e}")
-            print(f"Необходимо настроить программу заново.")
+            print(f"{RED}{loc.tr('settings_file_error')}: {e}")
+            print(f"{loc.tr('program_reconfiguration_required')}")
             settings = define_settings(settings_path)
 
     base_dir = Path(settings["base_dir"])
