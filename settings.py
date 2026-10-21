@@ -125,9 +125,9 @@ def change_language(settings_path=SETTINGS_PATH):
         print(f"{GREEN}  {num} {w} {YELLOW}{language}")
     try:
         choice = int(input(f"\n{ORANGE}{loc.tr('choose_app_language')} {w} {BLUE}").lower())
-    except ValueError:
+        language = localizations.get(choice, None)
+    except (ValueError, UnboundLocalError):
         language = None
-    language = localizations.get(choice)
 
     if not language:
         log(f"{RED}{loc.tr('language_selection_error')}")

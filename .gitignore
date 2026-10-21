@@ -11,3 +11,4 @@ help.txt
 settings.json
 _deprecated.*
 *.log
+analyze_dependancy.py
