@@ -1,6 +1,4 @@
 import asyncio
-import hashlib
-import json
 import os
 import re
 import shutil
@@ -11,7 +9,6 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
 import aiohttp
-from tqdm import tqdm as bar
 
 import localization as loc
 from colors import (
@@ -22,7 +19,6 @@ from colors import (
     RESET,
     WHITE,
     YELLOW,
-    barcolor,
     l,
     o,
     r,
@@ -30,7 +26,18 @@ from colors import (
     w,
     x,
 )
+from local_disk import (
+    clean_up,
+    copy_with_progress,
+    get_free_space,
+    get_local_files_info,
+)
 from logger import log
+from md5_cache import (
+    clean_md5_cache,
+    read_md5_cache,
+    save_md5_cache,
+)
 from settings import change_base_dir, change_language, read_settings
 from token_storage import change_token, delete_token, read_token
 from yandex_client import (
@@ -79,101 +86,12 @@ def clear():
     )
 
 
-def get_free_space(folder_name: Path):
-    return shutil.disk_usage(folder_name).free
-
-
 def format_size(size_bytes: int):
     return (
         f"{size_bytes / (1024**3):.2f} {loc.tr('size_gb')}"
         if size_bytes >= 1024**3
         else f"{size_bytes / (1024**2):.2f} {loc.tr('size_mb')}"
     )
-
-
-def read_md5_cache(base_dir):
-    md5_path = base_dir / "md5_cache.json"
-    if not (md5_path).exists():
-        return {}
-    with open(md5_path, "r", encoding="utf-8") as f:
-        md5_cache = json.load(f)
-    md5_cache = clean_md5_cache(md5_cache, base_dir)
-    return md5_cache
-
-
-def clean_md5_cache(md5_cache, base_dir):
-    folders = [item.name for item in base_dir.iterdir() if item.is_dir()]
-    for key in list(md5_cache.keys()):
-        if key not in folders:
-            del md5_cache[key]
-    return md5_cache
-
-
-def get_file_info(root_dir: Path, folder_name: str, md5_cache: dict):
-    file_info, total_size, file_count = {}, 0, 0
-    cache = md5_cache.setdefault(folder_name, {})  # если папки нет в кэше — создаём
-
-    # --- обход папки ---
-    for path in root_dir.rglob("*"):
-        if not path.is_file():
-            continue
-        try:
-            stat = path.stat()
-            size = stat.st_size
-            last_edit = stat.st_mtime
-            rel_path = path.relative_to(root_dir).as_posix()
-
-            file_info[rel_path] = {
-                "size": size,
-                "full_path": str(path),
-                "last_edit": last_edit,
-            }
-            total_size += size
-            file_count += 1
-        except OSError:
-            continue
-
-    # --- этап 1: определяем что нужно пересчитывать ---
-    to_recalculate = []
-
-    for rel_path, info in file_info.items():
-        cache_entry = cache.get(rel_path)
-        if cache_entry and info["last_edit"] == cache_entry.get("last_edit"):
-            info["md5"] = cache_entry["md5"]
-        else:
-            to_recalculate.append((rel_path, info))
-
-    # --- этап 2: считаем md5 только для нужных файлов ---
-    total = len(to_recalculate)
-    if total:
-        for ind, (rel_path, info) in enumerate(to_recalculate, start=1):
-            md5 = calculate_file_hash(root_dir / rel_path, ind=ind, total=total)
-            info["md5"] = md5
-            cache[rel_path] = {"md5": md5, "last_edit": info["last_edit"]}
-
-    # --- очистка кэша от лишних записей---
-    for rel_path in list(cache.keys()):
-        if rel_path not in file_info:
-            del cache[rel_path]
-
-    log(
-        f"\n{YELLOW}📂 {GREEN}{loc.tr('local_files_found')}:{' ' * 8}{BLUE}{file_count}, "
-        f"{loc.tr('total_size')}: {total_size:,} {loc.tr('size_bytes')} ({format_size(total_size)})"
-    )
-    return file_info
-
-
-def calculate_file_hash(file_path: Path, ind: int, total: int, hash_algorithm: str = "md5"):
-    message = f"\r{r} {BLUE}{loc.tr('calculating_file_hash')} {ind} {loc.tr('of')} {total}: \n"
-    print(message, end="")
-    try:
-        h = hashlib.new(hash_algorithm)
-        with open(file_path, "rb") as f:
-            for chunk in iter(lambda: f.read(8192), b""):
-                h.update(chunk)
-        return h.hexdigest()
-    except FileNotFoundError:
-        return None
 
 
 def find_invalid_paths(file_info: dict):
@@ -219,26 +137,6 @@ def manage_invalid(invalid):
 
 def has_enough_space(free: int, size: int):
     return (free >= size, free - size if free >= size else free)
-
-
-def copy_with_progress(src, dst, buffer_size=8 * 1024 * 1024):
-    total_size = Path(src).stat().st_size
-    with (
-        open(src, "rb") as fsrc,
-        open(dst, "wb") as fdst,
-        bar(
-            total=total_size,
-            unit="B",
-            unit_scale=True,
-            desc=f"  {BLUE}💾 {loc.tr('copying')}",
-            leave=False,
-            ncols=100,
-            colour=barcolor,
-        ) as pbar,
-    ):
-        for buf in iter(lambda: fsrc.read(buffer_size), b""):
-            fdst.write(buf)
-            pbar.update(len(buf))
 
 
 def resolve_missing(data1: dict, data2: dict, info2: dict, state: AppState, rel_path: str, folder_name: str, moved: list[str]):
@@ -338,30 +236,6 @@ async def synchronize(
     return local, moved
 
 
-def clean_up(local: list[str], base_dir: Path):
-    if local and input(f"{RED}{loc.tr('delete_local_files_prompt')}{w} ").lower() == "y":
-        for file in local:
-            try:
-                Path(file).unlink()
-                print(f"{v} {GREEN}{file} {loc.tr('deleted_from_local_disk')}\n")
-            except FileNotFoundError:
-                continue
-    for dirpath in sorted(base_dir.rglob("*"), key=lambda p: -p.parts.__len__()):
-        if dirpath.is_dir():
-            try:
-                dirpath.rmdir()
-                log(f"{loc.tr('empty_folder_deleted')}: {dirpath.name}", print_msg=False)
-            except OSError:
-                continue
-    print()
-
-
-def save_md5_cache(md5_cache: dict, base_dir: Path):
-    path = base_dir / "md5_cache.json"
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(md5_cache, f, ensure_ascii=False, indent=4, default=str)
-
-
 async def settings_menu(state: AppState, session: aiohttp.ClientSession):
     while True:
         clear()
@@ -420,7 +294,11 @@ async def main_async():
                     print(f"{YELLOW}📂 {BLUE}{loc.tr('processing_folder')} {YELLOW}{folder_name}")
                     folder = state.base_dir / folder_name
                     folder.mkdir(parents=True, exist_ok=True)
-                    data1 = get_file_info(folder, folder_name, state.md5_cache)
+                    data1, total_size, file_count = get_local_files_info(folder, folder_name, state.md5_cache)
+                    log(
+                        f"\n{YELLOW}📂 {GREEN}{loc.tr('local_files_found')}:{' ' * 8}{BLUE}{file_count}, "
+                        f"{loc.tr('total_size')}: {total_size:,} {loc.tr('size_bytes')} ({format_size(total_size)})"
+                    )
                     data2, total_size, file_count = await get_yandex_file_info_async(folder_name, state.headers, session)
                     log(
                         f"{WHITE}☁  {GREEN}{loc.tr('files_found_on')} {RED}{loc.tr('yandex_disk')} {GREEN}{loc.tr('files_count')}: "
