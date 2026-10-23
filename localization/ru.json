@@ -11,6 +11,7 @@
     "change_settings": "Изменить настройки",
     "choose_app_language": "Выберите язык приложения",
     "choose_save_directory": "Выберите каталог сохранения",
+    "chosen": "Выбраны: ",
     "copied": "Скопирован",
     "copying": "Копирую",
     "critical_error": "Критическая ошибка",
@@ -73,5 +74,5 @@
     "total_size": "общий размер",
     "unknown_setting": "Неизвестный параметр",
     "user": "Пользователь",
-    "yandex_disk": "Яндекс.Диске"
+    "yandex_disk": "Яндекс.Диск"
 }

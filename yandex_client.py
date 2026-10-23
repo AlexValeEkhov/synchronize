@@ -5,7 +5,7 @@ import aiohttp
 from tqdm import tqdm as bar
 
 import localization as loc
-from colors import BLUE, GREEN, ORANGE, RED, RESET, WHITE, barcolor, w
+from colors import BLUE, GREEN, RED, RESET, barcolor
 from logger import log
 
 BASE_URL = "https://cloud-api.yandex.net/v1/disk/resources"
@@ -18,11 +18,11 @@ async def get_user_info(session: aiohttp.ClientSession, headers: dict) -> dict:
         return await response.json()
 
 
-async def get_root_folder(session, headers: dict) -> tuple[str, str] | tuple[None, None]:
+async def get_root_folders(session: aiohttp.ClientSession, headers: dict) -> list[dict] | None:
     async with session.get(BASE_URL, headers=headers, params={"path": "/"}) as response:
         if response.status != 200:
             print(f"{RED}{loc.tr('http_error')}: {response.status}\n{await response.text()}")
-            return None, None
+            return None
 
         data = await response.json()
 
@@ -31,24 +31,9 @@ async def get_root_folder(session, headers: dict) -> tuple[str, str] | tuple[Non
 
     if not folders:
         print(f"{RED}{loc.tr('no_root_folders')}")
-        return None, None
+        return None
 
-    while True:
-        print(f"\n{GREEN}{loc.tr('available_root_folders')}{RESET}")
-        for i, folder in enumerate(folders, start=1):
-            print(f"{RED}{i:>3} {w} {BLUE}{folder['name']}")
-        print(f"\n{RED}  0 {w} {ORANGE}{loc.tr('return_to_menu')}")
-
-        try:
-            choice = int(input(f"{GREEN}{loc.tr('select_folder_number')}: {w}"))
-            if choice == 0:
-                return None, None
-            if 1 <= choice <= len(folders):
-                return folders[choice - 1]["path"], folders[choice - 1]["name"]
-        except ValueError:
-            pass
-
-        print(f"{RED}{loc.tr('enter_number_range')}: 0–{len(folders)}")
+    return folders
 
 
 async def get_yandex_file_info_async(base_path: str, headers: dict, session: aiohttp.ClientSession):

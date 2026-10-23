@@ -4,7 +4,7 @@ from pathlib import Path
 from tqdm import tqdm as bar
 
 import localization as loc
-from colors import BLUE, GREEN, RED, barcolor, v, w
+from colors import BLUE, GREEN, RED, barcolor, r, v, w
 from logger import log
 from md5_cache import calculate_file_hash
 
@@ -15,9 +15,8 @@ def get_free_space(folder_name: Path):
 
 def get_local_files_info(root_dir: Path, folder_name: str, md5_cache: dict) -> {dict, int, int}:
     file_info, total_size, file_count = {}, 0, 0
-    cache = md5_cache.setdefault(folder_name, {})  # если папки нет в кэше — создаём
+    cache = md5_cache.setdefault(folder_name, {})
 
-    # --- обход папки ---
     for path in root_dir.rglob("*"):
         if not path.is_file():
             continue
@@ -37,7 +36,6 @@ def get_local_files_info(root_dir: Path, folder_name: str, md5_cache: dict) -> {
         except OSError:
             continue
 
-    # --- этап 1: определяем что нужно пересчитывать ---
     to_recalculate = []
 
     for rel_path, info in file_info.items():
@@ -47,15 +45,16 @@ def get_local_files_info(root_dir: Path, folder_name: str, md5_cache: dict) -> {
         else:
             to_recalculate.append((rel_path, info))
 
-    # --- этап 2: считаем md5 только для нужных файлов ---
     total = len(to_recalculate)
     if total:
         for ind, (rel_path, info) in enumerate(to_recalculate, start=1):
-            md5 = calculate_file_hash(root_dir / rel_path, ind=ind, total=total)
+            message = f"\r{r} {BLUE}{loc.tr('calculating_file_hash')} {ind} {loc.tr('of')} {total} "
+            print(message, end="", flush=True)
+            md5 = calculate_file_hash(root_dir / rel_path)
             info["md5"] = md5
             cache[rel_path] = {"md5": md5, "last_edit": info["last_edit"]}
+        print()
 
-    # --- очистка кэша от лишних записей---
     for rel_path in list(cache.keys()):
         if rel_path not in file_info:
             del cache[rel_path]
