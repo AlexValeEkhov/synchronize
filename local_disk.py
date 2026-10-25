@@ -1,10 +1,12 @@
+import asyncio
 import shutil
 from pathlib import Path
 
+import aiohttp
 from tqdm import tqdm as bar
 
 import localization as loc
-from colors import BLUE, GREEN, RED, barcolor, r, v, w
+from colors import BLUE, GREEN, RED, RESET, barcolor, r, v, w
 from logger import log
 from md5_cache import calculate_file_hash
 
@@ -80,6 +82,76 @@ def copy_with_progress(src, dst, buffer_size=8 * 1024 * 1024):
         for buf in iter(lambda: fsrc.read(buffer_size), b""):
             fdst.write(buf)
             pbar.update(len(buf))
+
+
+async def download_to_local(
+    download_url: str,
+    local_path: Path,
+    session: aiohttp.ClientSession,
+    size: int = 10_000_000,
+) -> float | None:
+    temp_path = local_path.with_name(f".{local_path.name}.download")
+    delays = (2, 5)
+    max_attempts = 3
+
+    local_path.parent.mkdir(parents=True, exist_ok=True)
+
+    for attempt in range(1, max_attempts + 1):
+        log(
+            f"Download attempt {attempt}/{max_attempts}: {local_path}",
+            1,
+            False,
+        )
+
+        try:
+            async with session.get(download_url) as response:
+                response.raise_for_status()
+
+                with (
+                    open(temp_path, "wb") as f,
+                    bar(
+                        total=size,
+                        unit="B",
+                        unit_scale=True,
+                        desc=f"  {BLUE}💾 {loc.tr('downloading')}",
+                        ncols=100,
+                        leave=False,
+                        colour=barcolor,
+                    ) as pbar,
+                ):
+                    async for chunk in response.content.iter_chunked(8192):
+                        if chunk:
+                            f.write(chunk)
+                            pbar.update(len(chunk))
+
+            temp_path.replace(local_path)
+
+            last_edit = local_path.stat().st_mtime
+            log(
+                f"Download succeeded on attempt {attempt}/{max_attempts}: {local_path}",
+                1,
+                False,
+            )
+            log(f"  {GREEN}💾 {loc.tr('downloaded')}: {BLUE}{local_path}{RESET}")
+            return last_edit
+
+        except (aiohttp.ClientError, OSError) as e:
+            log(
+                f"Download attempt {attempt}/{max_attempts} failed: {local_path}; {type(e).__name__}: {e}",
+                3,
+                False,
+            )
+
+            if attempt < max_attempts:
+                delay = delays[attempt - 1]
+                log(f"Retrying download in {delay} seconds: {local_path}", 1, False)
+                await asyncio.sleep(delay)
+
+        finally:
+            temp_path.unlink(missing_ok=True)
+
+    print(f"  {RED}⛔ {loc.tr('not_downloaded')}{RESET}")
+    return None
 
 
 def clean_up(local: list[str], base_dir: Path):

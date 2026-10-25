@@ -17,9 +17,9 @@ import aiohttp
 
 import localization as loc
 from colors import BLUE, GREEN, ORANGE, RED, RESET, r, w, x
-from local_disk import copy_with_progress, get_free_space
+from local_disk import copy_with_progress, download_to_local, get_free_space
 from logger import log
-from yandex_client import download_file_from_yandex
+from yandex_client import get_download_url
 
 
 def format_size(size_bytes: int):
@@ -148,14 +148,15 @@ async def synchronize(
         if download and info2:
             ok, free = has_enough_space(free, info2["size"])
             if ok:
-                last_edit = await download_file_from_yandex(
+                last_edit = None
+                download_url = await get_download_url(
                     info2["path"],
-                    local_path,
                     state.headers,
                     session,
-                    info2["size"],
                 )
-                if last_edit:
+                if download_url:
+                    last_edit = await download_to_local(download_url, local_path, session, info2["size"])
+                if last_edit is not None:
                     state.md5_cache[folder_name][rel_path] = {"md5": info2["md5"], "last_edit": last_edit}
             else:
                 log(f"{RED}⛔ {loc.tr('insufficient_space_for')} {local_path}{RESET}", 3)

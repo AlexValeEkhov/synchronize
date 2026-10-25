@@ -6,7 +6,7 @@ import localization as loc
 from colors import BLUE, r
 
 
-def calculate_file_hash(file_path: Path, hash_algorithm: str = "md5") -> str:
+def calculate_file_hash(file_path: Path, hash_algorithm: str = "md5") -> str | None:
     try:
         h = hashlib.new(hash_algorithm)
         with open(file_path, "rb") as f:

@@ -58,9 +58,9 @@ async def main_async():
         state = await load_app_state(session)
         while True:
             dir_list = [x for x in state.md5_cache.keys()]
-            dir_list, state = await main_menu(session, load_app_state, dir_list, state)
-            clear()
             try:
+                dir_list, state = await main_menu(session, load_app_state, dir_list, state)
+                clear()
                 local, moved = [], []
                 for folder_name in dir_list:
                     print(f"{YELLOW}📂 {BLUE}{loc.tr('processing_folder')} {YELLOW}{folder_name}")

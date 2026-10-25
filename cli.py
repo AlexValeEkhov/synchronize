@@ -35,7 +35,7 @@ def manage_invalid(invalid: dict):
         print(f"  └─ {BLUE}{loc.tr('reason')}: {reason}")
 
 
-async def yandex_root_menu(folders: list) -> tuple[list, list]:
+async def yandex_root_menu(folders: list) -> str | None:
     while True:
         clear()
         print(f"\n{GREEN}{loc.tr('available_root_folders')}{RESET}")

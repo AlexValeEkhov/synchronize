@@ -2,10 +2,9 @@ import asyncio
 from pathlib import Path, PurePosixPath
 
 import aiohttp
-from tqdm import tqdm as bar
 
 import localization as loc
-from colors import BLUE, GREEN, RED, RESET, barcolor
+from colors import RED, RESET
 from logger import log
 
 BASE_URL = "https://cloud-api.yandex.net/v1/disk/resources"
@@ -73,16 +72,13 @@ async def get_yandex_file_info_async(base_path: str, headers: dict, session: aio
     return file_info, total_size, file_count
 
 
-async def download_file_from_yandex(
+async def get_download_url(
     yandex_path: str,
-    local_path: Path,
     headers: dict,
     session: aiohttp.ClientSession,
-    size: int = 10_000_000,
-) -> float | None:
-    url = f"{BASE_URL}/download"
+) -> str | None:
 
-    # Этап 1. Получаем ссылку на скачивание через API Яндекс.Диска.
+    url = f"{BASE_URL}/download"
     async with session.get(
         url,
         headers=headers,
@@ -104,40 +100,4 @@ async def download_file_from_yandex(
             3,
         )
         return None
-
-    # Этап 2. Скачиваем файл и записываем его на диск.
-    try:
-        local_path.parent.mkdir(parents=True, exist_ok=True)
-
-        async with session.get(download_url) as response:
-            response.raise_for_status()
-
-            with (
-                open(local_path, "wb") as f,
-                bar(
-                    total=size,
-                    unit="B",
-                    unit_scale=True,
-                    desc=f"  {BLUE}💾 {loc.tr('downloading')}",
-                    ncols=100,
-                    leave=False,
-                    colour=barcolor,
-                ) as pbar,
-            ):
-                async for chunk in response.content.iter_chunked(8192):
-                    if chunk:
-                        f.write(chunk)
-                        pbar.update(len(chunk))
-
-        log(f"  {GREEN}💾 {loc.tr('downloaded')}: {BLUE}{local_path}{RESET}")
-        return local_path.stat().st_mtime
-
-    except OSError as e:
-        if e.errno == 28:
-            log(
-                f"  {RED}⛔ {loc.tr('insufficient_disk_space_for')} {local_path}{RESET}",
-                3,
-            )
-            return None
-
-        raise
+    return download_url
