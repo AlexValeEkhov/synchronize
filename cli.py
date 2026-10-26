@@ -56,12 +56,15 @@ async def yandex_root_menu(folders: list) -> str | None:
 
 
 async def settings_menu(
-    load_app_state: Callable[[aiohttp.ClientSession], Awaitable[AppState]],
+    load_app_state: Callable[[aiohttp.ClientSession], Awaitable[AppState | None]],
     session: aiohttp.ClientSession,
-) -> AppState:
+) -> AppState | None:
+
     while True:
         clear()
         state = await load_app_state(session)
+        if state is None:
+            return None
         print(f"{BLUE}{loc.tr('user')}: {YELLOW}{state.user}")
         print(f"{GREEN}\n{loc.tr('program_settings')}:")
         print(f"{GREEN}  1 {w} {BLUE}{loc.tr('change_save_directory')}. {loc.tr('current')}: {YELLOW}{state.base_dir}")
@@ -87,10 +90,11 @@ async def settings_menu(
 
 async def main_menu(
     session: aiohttp.ClientSession,
-    load_app_state: Callable[[aiohttp.ClientSession], Awaitable[AppState]],
+    load_app_state: Callable[[aiohttp.ClientSession], Awaitable[AppState | None]],
     dir_list: list[str],
     state: AppState,
-) -> tuple[list[str], AppState]:
+) -> tuple[list[str] | None, AppState | None]:
+
     while True:
         log(f"{BLUE}{loc.tr('user')}: {YELLOW}{state.user}")
         print(f"\n{GREEN}  1 {w} {BLUE}{loc.tr('sync_all_local_folders')}:\n\t{loc.tr('chosen')}{YELLOW}{dir_list}")
@@ -99,7 +103,7 @@ async def main_menu(
         print(f" {'_' * 52}\n{RED} {loc.tr('any_key')} {w} {BLUE} {loc.tr('exit_program')}")
         choice = input(f"{w} ")
         if choice not in {"1", "2", "3"}:
-            sys.exit()
+            return None, None
         if choice == "2":
             folders = await get_root_folders(session, state.headers)
             if not folders:
@@ -112,6 +116,8 @@ async def main_menu(
             return [name], state
         if choice == "3":
             state = await settings_menu(load_app_state, session)
+            if state is None:
+                return None, None
             clear()
             continue
         if choice == "1":

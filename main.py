@@ -17,7 +17,7 @@ from md5_cache import (
 )
 from settings import read_settings
 from synchronize import find_invalid_paths, format_size, synchronize
-from token_storage import read_token
+from token_storage import delete_token, read_token
 from yandex_client import get_user_info, get_yandex_file_info_async
 
 VER = 1.19
@@ -33,33 +33,52 @@ class AppState:
     md5_cache: dict
 
 
-async def load_app_state(session):
+async def load_app_state(session: aiohttp.ClientSession) -> AppState | None:
     base_dir, lang = read_settings()
     loc.load_locale(lang)
 
-    token = read_token()
-    headers = {"Authorization": f"OAuth {token}"}
-    user = await get_user_info(session, headers)
-    md5_cache = read_md5_cache(base_dir)
+    while True:
+        token = await read_token()
+        if not token:
+            return None
 
-    return AppState(
-        base_dir=base_dir,
-        lang=lang,
-        token=token,
-        headers=headers,
-        user=user.get("login"),
-        md5_cache=md5_cache,
-    )
+        headers = {"Authorization": f"OAuth {token}"}
+
+        try:
+            user = await get_user_info(session, headers)
+        except aiohttp.ClientResponseError as e:
+            if e.status != 401:
+                raise
+
+            log(f"{RED}{loc.tr('invalid_token')}", 2)
+            delete_token()
+            continue
+
+        md5_cache = read_md5_cache(base_dir)
+
+        return AppState(
+            base_dir=base_dir,
+            lang=lang,
+            token=token,
+            headers=headers,
+            user=user.get("login"),
+            md5_cache=md5_cache,
+        )
 
 
 async def main_async():
+    log("App started", print_msg=False)
     clear()
     async with aiohttp.ClientSession() as session:
         state = await load_app_state(session)
+        if state is None:
+            return
         while True:
             dir_list = [x for x in state.md5_cache.keys()]
             try:
                 dir_list, state = await main_menu(session, load_app_state, dir_list, state)
+                if state is None:
+                    return
                 clear()
                 local, moved = [], []
                 for folder_name in dir_list:
