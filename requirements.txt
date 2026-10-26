@@ -11,7 +11,10 @@ jaraco.functools==4.6.0
 keyring==25.7.0
 more-itertools==11.2.1
 multidict==7.1.0
+prompt_toolkit==3.0.53
 propcache==0.5.4
+pyperclip==1.11.0
 pywin32-ctypes==0.2.3
 tqdm==4.70.1
+wcwidth==0.9.4
 yarl==1.25.1
