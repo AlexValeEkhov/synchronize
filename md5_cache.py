@@ -3,7 +3,8 @@ import json
 from pathlib import Path
 
 import localization as loc
-from colors import BLUE, r
+from colors import RED, RESET
+from logger import log
 
 
 def calculate_file_hash(file_path: Path, hash_algorithm: str = "md5") -> str | None:
@@ -37,5 +38,16 @@ def clean_md5_cache(md5_cache: dict, base_dir: Path) -> dict:
 
 def save_md5_cache(md5_cache: dict, base_dir: Path):
     path = base_dir / "md5_cache.json"
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(md5_cache, f, ensure_ascii=False, indent=4, default=str)
+    temp_path = base_dir / "md5_cache.tmp"
+
+    try:
+        with open(temp_path, "w", encoding="utf-8") as f:
+            json.dump(md5_cache, f, ensure_ascii=False, indent=4, default=str)
+
+        temp_path.replace(path)
+
+    except OSError as e:
+        log(f"{RED}{loc.tr('cache_not_saved')}: {e}{RESET}", 3)
+
+    finally:
+        temp_path.unlink(missing_ok=True)

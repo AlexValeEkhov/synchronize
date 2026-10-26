@@ -1,9 +1,10 @@
 {
     "access_token_deleted_reenter_required": "Токен доступа удален. Необходимо ввести новый токен для продолжения работы.",
     "and": "и",
-    "any_key": "Any Key",
+    "any_key": "Другая клавиша",
     "available_root_folders": "Доступные папки в корне Яндекс.Диска:",
     "base_dir_must_be_string": "Параметр base_dir должен быть строкой.",
+    "cache_not_saved": "Не удалось сохранить кэш состояния файлов на локальном диске.",
     "calculating_file_hash": "Считаю хэш-сумму файла",
     "change_access_token": "Изменить токен доступа",
     "change_interface_language": "Изменить язык интерфейса",

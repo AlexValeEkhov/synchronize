@@ -5,6 +5,7 @@
     "available_root_folders": "Available folders in the Yandex Disk root directory:",
     "base_dir_must_be_string": "The base_dir parameter must be a string.",
     "calculating_file_hash": "Calculating file hash",
+    "cache_not_saved": "Failed to save the file state cache to the local disk.",
     "change_access_token": "Change access token",
     "change_interface_language": "Change interface language",
     "change_save_directory": "Change save directory",
